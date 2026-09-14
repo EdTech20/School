@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluate Lecturers - Staff Appraisal System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="../Style&Functions/styles.css">
+</head>
+<body class="dashboard-page sidebar-open">
+
+<div class="main-content">
+    <div class="content-wrapper">
+        <div id="evaluationSessionState"></div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title">Evaluate Lecturers</h3>
+                <div class="filter-bar">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="evalSearch" placeholder="Search lecturer...">
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Lecturer</th>
+                                <th>Department</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="evalTableBody">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Evaluation Modal -->
+<div class="modal-overlay" id="evalModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div>
+                <h3 class="modal-title">Evaluate Lecturer</h3>
+                <p class="text-gray mb-0" id="evalStaffDept"></p>
+            </div>
+            <button class="modal-close" id="closeEvalModal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <h4 class="mb-3" id="evalStaffName">Lecturer Name</h4>
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle-fill me-2"></i>Rate the lecturer from 0 to 10 on the following criteria.
+            </div>
+            
+            <form id="evaluationForm">
+                <div class="criteria-list">
+                    <!-- Criteria 1 to 7 -->
+                    <div class="form-group row align-items-center mb-3">
+                        <label class="col-sm-8 col-form-label">Teaching Effectiveness</label>
+                        <div class="col-sm-4">
+                            <input type="number" class="form-control" id="score1" min="0" max="10" required>
+                        </div>
+                    </div>
+                    <div class="form-group row align-items-center mb-3">
+                        <label class="col-sm-8 col-form-label">Subject Knowledge</label>
+                        <div class="col-sm-4">
+                            <input type="number" class="form-control" id="score2" min="0" max="10" required>
+                        </div>
+                    </div>
+                    <div class="form-group row align-items-center mb-3">
+                        <label class="col-sm-8 col-form-label">Communication Skills</label>
+                        <div class="col-sm-4">
+                            <input type="number" class="form-control" id="score3" min="0" max="10" required>
+                        </div>
+                    </div>
+                    <div class="form-group row align-items-center mb-3">
+                        <label class="col-sm-8 col-form-label">Classroom Management</label>
+                        <div class="col-sm-4">
+                            <input type="number" class="form-control" id="score4" min="0" max="10" required>
+                        </div>
+                    </div>
+                    <div class="form-group row align-items-center mb-3">
+                        <label class="col-sm-8 col-form-label">Accessibility / Availability</label>
+                        <div class="col-sm-4">
+                            <input type="number" class="form-control" id="score5" min="0" max="10" required>
+                        </div>
+                    </div>
+                    <div class="form-group row align-items-center mb-3">
+                        <label class="col-sm-8 col-form-label">Fairness in Grading</label>
+                        <div class="col-sm-4">
+                            <input type="number" class="form-control" id="score6" min="0" max="10" required>
+                        </div>
+                    </div>
+                    <div class="form-group row align-items-center mb-3">
+                        <label class="col-sm-8 col-form-label">Course Content Quality</label>
+                        <div class="col-sm-4">
+                            <input type="number" class="form-control" id="score7" min="0" max="10" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="score-summary mt-4 p-3 bg-light rounded">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <strong>Total Score:</strong>
+                        <span id="totalScoreDisplay" class="fs-5 text-primary fw-bold">0% (0 / 70)</span>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar" id="scoreProgress" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div class="form-group mt-3">
+                    <label class="form-label">Comments / Feedback</label>
+                    <textarea class="form-control" id="evalComments" rows="3" placeholder="Enter evaluation comments..."></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline-primary" id="cancelEval">Cancel</button>
+            <button class="btn btn-primary" id="submitEval">Submit Evaluation</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../Style&Functions/api.js"></script>
+<script src="../Style&Functions/App.js"></script>
+<script src="../Nav&Slide/nav.js"></script>
+<script src="student-evaluation.js"></script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Departments - Staff Appraisal System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="../Style&Functions/styles.css">
+</head>
+<body>
+    <div class="main-content">
+        <div class="content-wrapper">
+            <div class="d-flex justify-content-between align-center mb-4">
+                <h3>Department Management</h3>
+                <button class="btn btn-primary" id="addDeptBtn">
+                    <i class="bi bi-plus-lg"></i> Add Department
+                </button>
+            </div>
+
+            <div class="row" id="departmentsGrid">
+                <!-- Injected by JS -->
+            </div>
+
+            <div id="deptEmpty" class="empty-state hidden">
+                <i class="bi bi-building"></i>
+                <h3>No Departments</h3>
+                <p>Add departments to organize your staff.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Department Modal -->
+    <div class="modal-overlay" id="deptModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="deptModalTitle">Add Department</h3>
+                <button class="modal-close" id="closeDeptModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="deptForm">
+                    <div class="form-group">
+                        <label class="form-label">Department Name</label>
+                        <input type="text" class="form-control" id="deptName" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-primary" id="cancelDept">Cancel</button>
+                <button class="btn btn-primary" id="saveDept">Save Department</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HOD Handover Modal -->
+    <div class="modal-overlay" id="handoverModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="handoverModalTitle">HOD Handover</h3>
+                <button class="modal-close" id="closeHandoverModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">Select a lecturer to appoint as new HOD for <strong id="handoverDeptName"></strong>.</p>
+                <div class="form-group">
+                    <label class="form-label">Select New HOD</label>
+                    <select class="form-select" id="newHODSelect">
+                        <option value="">Select Lecturer</option>
+                    </select>
+                </div>
+                <div id="handoverCodeArea" class="hidden mt-3 p-3" style="background: #d4edda; border-radius: var(--radius);">
+                    <strong>Handover Code:</strong> <span id="handoverCode" style="font-size: 18px; font-weight: 700; color: var(--success);"></span>
+                    <p class="mb-0 mt-1" style="font-size: 13px;">Share this code with the new HOD. They have 2 login attempts.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-primary" id="cancelHandover">Cancel</button>
+                <button class="btn btn-primary" id="confirmHandover">Confirm Handover</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../Style&Functions/api.js"></script>
+    <script src="../Style&Functions/App.js"></script>
+    <script src="../Nav&Slide/nav.js"></script>
+    <script src="departments.js"></script>
+</body>
+</html>

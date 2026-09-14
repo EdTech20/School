@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Staff Appraisal System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="../Style&Functions/styles.css">
+</head>
+<body>
+    <div class="main-content">
+        <div class="content-wrapper">
+            <div class="row">
+                <div class="col-lg-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="settings-nav">
+                                <div class="settings-nav-item active" data-section="account">
+                                    <i class="bi bi-person"></i> Account
+                                </div>
+                                <div class="settings-nav-item" data-section="security">
+                                    <i class="bi bi-shield-lock"></i> Security
+                                </div>
+                                <div class="settings-nav-item" data-section="notifications">
+                                    <i class="bi bi-bell"></i> Notifications
+                                </div>
+                                <div class="settings-nav-item text-danger" data-section="danger">
+                                    <i class="bi bi-exclamation-triangle"></i> Danger Zone
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-9">
+                    <!-- Account Section -->
+                    <div class="settings-section active" id="section-account">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Account Settings</h3>
+                            </div>
+                            <div class="card-body">
+                                <form id="accountForm">
+                                    <div class="form-group">
+                                        <label class="form-label">Full Name</label>
+                                        <input type="text" class="form-control" id="settingsName" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Email</label>
+                                        <input type="email" class="form-control" id="settingsEmail" readonly>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">School Staff ID</label>
+                                        <input type="text" class="form-control" id="settingsStaffId" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Department</label>
+                                        <input type="text" class="form-control" id="settingsDept" readonly>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Phone</label>
+                                        <input type="tel" class="form-control" id="settingsPhone">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Bio</label>
+                                        <textarea class="form-control" id="settingsBio" rows="3"></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-save"></i> Save Changes
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Security Section -->
+                    <div class="settings-section" id="section-security">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Change Password</h3>
+                            </div>
+                            <div class="card-body">
+                                <form id="passwordForm">
+                                    <div class="form-group">
+                                        <label class="form-label">Current Password</label>
+                                        <input type="password" class="form-control" id="currentPassword" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">New Password</label>
+                                        <input type="password" class="form-control" id="newPassword" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Confirm New Password</label>
+                                        <input type="password" class="form-control" id="confirmNewPassword" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-shield-lock"></i> Update Password
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notifications Section -->
+                    <div class="settings-section" id="section-notifications">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Notification Preferences</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="notifEmail" checked>
+                                    <label class="form-check-label" for="notifEmail">Email Notifications</label>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="notifEval" checked>
+                                    <label class="form-check-label" for="notifEval">Evaluation Updates</label>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="notifApp" checked>
+                                    <label class="form-check-label" for="notifApp">Application Status Changes</label>
+                                </div>
+                                <button class="btn btn-primary" id="saveNotifBtn">
+                                    <i class="bi bi-save"></i> Save Preferences
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Danger Zone -->
+                    <div class="settings-section" id="section-danger">
+                        <div class="card" style="border-left: 4px solid var(--danger);">
+                            <div class="card-header">
+                                <h3 class="card-title text-danger">Danger Zone</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-center mb-3">
+                                    <div>
+                                        <h5>Delete Account</h5>
+                                        <p class="text-gray mb-0" style="font-size: 14px;">This action cannot be undone.</p>
+                                    </div>
+                                    <button class="btn btn-danger" id="deleteAccountBtn">
+                                        <i class="bi bi-trash"></i> Delete Account
+                                    </button>
+                                </div>
+                                <hr>
+                                <div class="d-flex justify-content-between align-center">
+                                    <div>
+                                        <h5>Clear All Data</h5>
+                                        <p class="text-gray mb-0" style="font-size: 14px;">Remove all local data (VC only).</p>
+                                    </div>
+                                    <button class="btn btn-danger" id="clearDataBtn">
+                                        <i class="bi bi-exclamation-triangle"></i> Clear Data
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../Style&Functions/api.js"></script>
+    <script src="../Style&Functions/App.js"></script>
+    <script src="../Nav&Slide/nav.js"></script>
+    <script src="settings.js"></script>
+</body>
+</html>

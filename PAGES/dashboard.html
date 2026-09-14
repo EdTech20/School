@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Staff Appraisal System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="../Style&Functions/styles.css">
+</head>
+<body>
+    <div class="main-content">
+        <div class="content-wrapper">
+            <div id="hodSessionManager"></div>
+            <div class="stats-row" id="statsRow">
+                <!-- Stats injected by JS -->
+            </div>
+
+            <div class="row">
+                <div class="col-12" id="departmentStaffDirectory"></div>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Recent Evaluations</h3>
+                            <a href="#" id="recentEvaluationsLink" class="btn btn-sm btn-outline-primary hidden">View All</a>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-container">
+                                <table class="data-table" id="recentEvalsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Staff</th>
+                                            <th>Session</th>
+                                            <th>Result / Status</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="recentEvalsBody">
+                                        <!-- Injected by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Department Overview</h3>
+                        </div>
+                        <div class="card-body" id="deptOverview">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../Style&Functions/api.js"></script>
+    <script src="../Style&Functions/App.js"></script>
+    <script src="../Nav&Slide/nav.js"></script>
+    <script src="dashboard.js"></script>
+</body>
+</html>

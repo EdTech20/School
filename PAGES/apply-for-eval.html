@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apply for Evaluation - Staff Appraisal System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="../Style&Functions/styles.css">
+</head>
+<body>
+    <div class="main-content">
+        <div class="content-wrapper">
+            <div id="applicationSessionState"></div>
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Apply for Evaluation</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="applyForm">
+                                <div class="form-group">
+                                    <label class="form-label">Application Type</label>
+                                    <select class="form-select" id="appType" required>
+                                        <option value="">Select Type</option>
+                                        <option value="Promotion">Promotion</option>
+                                        <option value="Annual Review">Annual Review</option>
+                                        <option value="Contract Renewal">Contract Renewal</option>
+                                        <option value="Sabbatical">Sabbatical</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Details / Justification</label>
+                                    <textarea class="form-control" id="appDetails" rows="5" placeholder="Provide details about your application..." required></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Upload Supporting Documents</label>
+                                    <div class="cert-upload-area" id="appUploadArea">
+                                        <i class="bi bi-cloud-upload"></i>
+                                        <p>Click to upload certificates, transcripts, etc.</p>
+                                        <input type="file" id="appCertInput" multiple accept=".pdf,.doc,.docx,.jpg,.png" class="hidden">
+                                    </div>
+                                    <div class="cert-list" id="appCertList"></div>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary btn-lg w-100 mt-3">
+                                    <i class="bi bi-send"></i> Submit Application
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">My Applications</h3>
+                        </div>
+                        <div class="card-body" id="myAppsList">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../Style&Functions/api.js"></script>
+    <script src="../Style&Functions/App.js"></script>
+    <script src="../Nav&Slide/nav.js"></script>
+    <script src="apply-for-eval.js"></script>
+</body>
+</html>
