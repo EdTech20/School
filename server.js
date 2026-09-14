@@ -46,10 +46,14 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-app.listen(PORT, () => {
-    console.log(`====================================================`);
-    console.log(`Staff Appraisal & Evaluation System Server is running`);
-    console.log(`Server URL: http://localhost:${PORT}`);
-    console.log(`SQLite Database: initialized & ready`);
-    console.log(`====================================================`);
-});
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`====================================================`);
+        console.log(`Staff Appraisal & Evaluation System Server is running`);
+        console.log(`Server URL: http://localhost:${PORT}`);
+        console.log(`SQLite Database: initialized & ready`);
+        console.log(`====================================================`);
+    });
+}
+
+module.exports = app;
