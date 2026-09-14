@@ -1,8 +1,20 @@
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const fs = require('fs');
 
-const dbPath = path.join(__dirname, '..', 'database.sqlite');
+const isVercel = !!process.env.VERCEL;
+const defaultDbPath = path.join(__dirname, '..', 'database.sqlite');
+const dbPath = isVercel ? path.join('/tmp', 'database.sqlite') : defaultDbPath;
+
+if (isVercel && fs.existsSync(defaultDbPath) && !fs.existsSync(dbPath)) {
+    try {
+        fs.copyFileSync(defaultDbPath, dbPath);
+    } catch (e) {
+        console.error('Failed to copy initial DB to /tmp:', e);
+    }
+}
+
 const db = new Database(dbPath);
 
 // Enable foreign keys
