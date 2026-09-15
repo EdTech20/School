@@ -26,6 +26,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Serve static frontend files
+app.use(express.static(process.cwd()));
 app.use(express.static(path.join(__dirname)));
 
 // API Routes
@@ -44,12 +45,15 @@ app.get('*', (req, res) => {
     if (req.path.startsWith('/api')) {
         return res.status(404).json({ ok: false, message: 'API endpoint not found' });
     }
-    const indexPath = path.join(__dirname, 'index.html');
+    const indexPath = path.resolve(process.cwd(), 'index.html');
     if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath);
-    } else {
-        res.status(200).send('Staff Appraisal System API is running.');
+        return res.sendFile(indexPath);
     }
+    const altPath = path.resolve(__dirname, 'index.html');
+    if (fs.existsSync(altPath)) {
+        return res.sendFile(altPath);
+    }
+    res.status(200).send('Staff Appraisal System API is running.');
 });
 
 if (require.main === module) {
