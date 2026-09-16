@@ -7,119 +7,104 @@ let db;
 const tursoUrl = process.env.TURSO_DATABASE_URL;
 const tursoToken = process.env.TURSO_AUTH_TOKEN;
 
+const memory = {
+    users: [],
+    departments: [],
+    sessions: [],
+    applications: [],
+    evaluations: [],
+    hodReviews: [],
+    passwordResetOTP: [],
+    notifications: []
+};
+
+let tursoClient = null;
+
 if (tursoUrl) {
     try {
         const { createClient } = require('@libsql/client');
-        const tursoClient = createClient({
+        tursoClient = createClient({
             url: tursoUrl,
             authToken: tursoToken
         });
-
-        db = {
-            pragma() {},
-            exec(sql) {
-                tursoClient.execute(sql).catch(e => console.error('Turso exec error:', e));
-            },
-            prepare(sql) {
-                return {
-                    run(...params) {
-                        tursoClient.execute({ sql, args: params }).catch(e => console.error('Turso run error:', e));
-                        return { changes: 1 };
-                    },
-                    get(...params) {
-                        try {
-                            const res = tursoClient.executeSync ? tursoClient.executeSync({ sql, args: params }) : null;
-                            return res && res.rows[0] ? res.rows[0] : null;
-                        } catch (e) {
-                            return null;
-                        }
-                    },
-                    all(...params) {
-                        try {
-                            const res = tursoClient.executeSync ? tursoClient.executeSync({ sql, args: params }) : null;
-                            return res && res.rows ? res.rows : [];
-                        } catch (e) {
-                            return [];
-                        }
-                    }
-                };
-            }
-        };
         console.log('Connected to Turso Cloud SQLite Database');
     } catch (e) {
         console.error('Turso client init error:', e);
     }
 }
 
-if (!db) {
+if (!tursoClient && !process.env.VERCEL) {
     try {
         const Database = require('better-sqlite3');
-        const isVercel = !!process.env.VERCEL;
         const defaultDbPath = path.join(__dirname, '..', 'database.sqlite');
-        const dbPath = isVercel ? path.join('/tmp', 'database.sqlite') : defaultDbPath;
+        const nativeDb = new Database(defaultDbPath);
+        nativeDb.pragma('foreign_keys = ON');
 
-        if (isVercel && fs.existsSync(defaultDbPath) && !fs.existsSync(dbPath)) {
-            try { fs.copyFileSync(defaultDbPath, dbPath); } catch (e) {}
-        }
-
-        db = new Database(dbPath);
-        db.pragma('foreign_keys = ON');
+        db = {
+            pragma(p) { return nativeDb.pragma(p); },
+            exec(sql) { return nativeDb.exec(sql); },
+            prepare(sql) { return nativeDb.prepare(sql); }
+        };
     } catch (err) {
-        console.warn('better-sqlite3 native module warning, switching to fallback engine:', err.message);
-        db = createFallbackDB();
+        console.warn('better-sqlite3 native module warning, using fallback engine:', err.message);
     }
 }
 
-function createFallbackDB() {
-    const memory = {
-        users: [],
-        departments: [],
-        sessions: [],
-        applications: [],
-        evaluations: [],
-        hodReviews: [],
-        passwordResetOTP: [],
-        notifications: []
-    };
-
-    return {
+if (!db) {
+    db = {
         pragma() {},
-        exec() {},
+        exec(sql) {
+            if (tursoClient) {
+                tursoClient.execute(sql).catch(e => console.error('Turso exec error:', e));
+            }
+        },
         prepare(sql) {
             const cleanSql = sql.trim();
             return {
                 run(...params) {
+                    if (tursoClient) {
+                        tursoClient.execute({ sql, args: params }).catch(e => console.error('Turso run error:', e));
+                    }
                     if (cleanSql.startsWith('INSERT INTO users')) {
                         const [id, email, password, fullName, staffId, department, role, isActive, profileImage, certificates, createdAt] = params;
+                        memory.users = memory.users.filter(u => u.id !== id && u.email !== email);
                         memory.users.push({ id, email, password, fullName, staffId, department, role, isActive: isActive ?? 1, profileImage: profileImage || null, certificates: certificates || '[]', bio: '', phone: '', loginAttempts: 0, handoverCode: null, createdAt: createdAt || new Date().toISOString() });
                     } else if (cleanSql.startsWith('INSERT INTO departments')) {
                         const [id, name, code, createdAt] = params;
+                        memory.departments = memory.departments.filter(d => d.id !== id && d.name !== name);
                         memory.departments.push({ id, name, code, hodId: null, createdAt: createdAt || new Date().toISOString() });
                     } else if (cleanSql.startsWith('INSERT INTO sessions')) {
                         const [id, name, academicYear, semester, status, isActive, createdAt] = params;
+                        memory.sessions = memory.sessions.filter(s => s.id !== id);
                         memory.sessions.push({ id, name, academicYear, semester, status: status || 'Open', isActive: isActive ?? 1, createdAt: createdAt || new Date().toISOString() });
                     } else if (cleanSql.startsWith('INSERT INTO applications')) {
                         const [id, staffId, department, type, details, certificates, sessionId, sessionName, status, score, submittedAt] = params;
+                        memory.applications = memory.applications.filter(a => a.id !== id);
                         memory.applications.push({ id, staffId, department, type, details, certificates: certificates || '[]', sessionId, sessionName, status: status || 'Pending', score: score || 0, submittedAt: submittedAt || new Date().toISOString() });
                     } else if (cleanSql.startsWith('INSERT INTO evaluations')) {
                         const [id, applicationId, staffId, evaluatorId, evaluatorRole, sessionId, department, scores, totalScore, comments, submittedAt] = params;
+                        memory.evaluations = memory.evaluations.filter(e => e.id !== id);
                         memory.evaluations.push({ id, applicationId, staffId, evaluatorId, evaluatorRole, sessionId, department, scores, totalScore, comments, submittedAt: submittedAt || new Date().toISOString() });
                     } else if (cleanSql.startsWith('INSERT INTO hodReviews')) {
                         const [id, applicationId, staffId, hodId, sessionId, reviewComments, recommendation, score, status, createdAt] = params;
+                        memory.hodReviews = memory.hodReviews.filter(r => r.id !== id);
                         memory.hodReviews.push({ id, applicationId, staffId, hodId, sessionId, reviewComments, recommendation, score, status, createdAt: createdAt || new Date().toISOString() });
                     } else if (cleanSql.startsWith('INSERT INTO notifications')) {
                         const [id, userId, title, message, isRead, type, createdAt] = params;
+                        memory.notifications = memory.notifications.filter(n => n.id !== id);
                         memory.notifications.push({ id, userId, title, message, isRead: isRead ?? 0, type: type || 'info', createdAt: createdAt || new Date().toISOString() });
                     } else if (cleanSql.startsWith('INSERT INTO passwordResetOTP')) {
                         const [id, email, otp, expiresAt, used, createdAt] = params;
                         memory.passwordResetOTP.push({ id, email, otp, expiresAt, used: used ?? 0, createdAt: createdAt || new Date().toISOString() });
-                    } else if (cleanSql.startsWith('UPDATE users SET status =') || cleanSql.includes('UPDATE users')) {
+                    } else if (cleanSql.includes('UPDATE users')) {
                         if (params.length >= 2) {
                             const targetId = params[params.length - 1];
-                            const u = memory.users.find(x => x.id === targetId);
-                            if (u && cleanSql.includes('isActive =')) u.isActive = params[0];
-                            if (u && cleanSql.includes('password =')) u.password = params[0];
-                            if (u && cleanSql.includes('handoverCode =')) { u.handoverCode = params[0]; u.loginAttempts = 0; }
+                            const u = memory.users.find(x => x.id === targetId || x.email === targetId);
+                            if (u) {
+                                if (cleanSql.includes('isActive =')) u.isActive = params[0];
+                                if (cleanSql.includes('password =')) u.password = params[0];
+                                if (cleanSql.includes('handoverCode =')) { u.handoverCode = params[0]; u.loginAttempts = 0; }
+                            }
                         }
                     } else if (cleanSql.includes('UPDATE sessions SET status =')) {
                         memory.sessions.forEach(s => { if (s.status === 'Open') s.status = 'Closed'; });
