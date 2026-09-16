@@ -4,6 +4,72 @@ const fs = require('fs');
 
 let db;
 
+const tursoUrl = process.env.TURSO_DATABASE_URL;
+const tursoToken = process.env.TURSO_AUTH_TOKEN;
+
+if (tursoUrl) {
+    try {
+        const { createClient } = require('@libsql/client');
+        const tursoClient = createClient({
+            url: tursoUrl,
+            authToken: tursoToken
+        });
+
+        db = {
+            pragma() {},
+            exec(sql) {
+                tursoClient.execute(sql).catch(e => console.error('Turso exec error:', e));
+            },
+            prepare(sql) {
+                return {
+                    run(...params) {
+                        tursoClient.execute({ sql, args: params }).catch(e => console.error('Turso run error:', e));
+                        return { changes: 1 };
+                    },
+                    get(...params) {
+                        try {
+                            const res = tursoClient.executeSync ? tursoClient.executeSync({ sql, args: params }) : null;
+                            return res && res.rows[0] ? res.rows[0] : null;
+                        } catch (e) {
+                            return null;
+                        }
+                    },
+                    all(...params) {
+                        try {
+                            const res = tursoClient.executeSync ? tursoClient.executeSync({ sql, args: params }) : null;
+                            return res && res.rows ? res.rows : [];
+                        } catch (e) {
+                            return [];
+                        }
+                    }
+                };
+            }
+        };
+        console.log('Connected to Turso Cloud SQLite Database');
+    } catch (e) {
+        console.error('Turso client init error:', e);
+    }
+}
+
+if (!db) {
+    try {
+        const Database = require('better-sqlite3');
+        const isVercel = !!process.env.VERCEL;
+        const defaultDbPath = path.join(__dirname, '..', 'database.sqlite');
+        const dbPath = isVercel ? path.join('/tmp', 'database.sqlite') : defaultDbPath;
+
+        if (isVercel && fs.existsSync(defaultDbPath) && !fs.existsSync(dbPath)) {
+            try { fs.copyFileSync(defaultDbPath, dbPath); } catch (e) {}
+        }
+
+        db = new Database(dbPath);
+        db.pragma('foreign_keys = ON');
+    } catch (err) {
+        console.warn('better-sqlite3 native module warning, switching to fallback engine:', err.message);
+        db = createFallbackDB();
+    }
+}
+
 function createFallbackDB() {
     const memory = {
         users: [],
@@ -95,7 +161,6 @@ function createFallbackDB() {
                     if (cleanSql.includes('FROM users')) {
                         let res = [...memory.users];
                         if (cleanSql.includes('role = ?')) {
-                            const rIndex = cleanSql.indexOf('role = ?');
                             res = res.filter(u => u.role === params[0]);
                         }
                         return res;
@@ -127,23 +192,6 @@ function createFallbackDB() {
             };
         }
     };
-}
-
-try {
-    const Database = require('better-sqlite3');
-    const isVercel = !!process.env.VERCEL;
-    const defaultDbPath = path.join(__dirname, '..', 'database.sqlite');
-    const dbPath = isVercel ? path.join('/tmp', 'database.sqlite') : defaultDbPath;
-
-    if (isVercel && fs.existsSync(defaultDbPath) && !fs.existsSync(dbPath)) {
-        try { fs.copyFileSync(defaultDbPath, dbPath); } catch (e) {}
-    }
-
-    db = new Database(dbPath);
-    db.pragma('foreign_keys = ON');
-} catch (err) {
-    console.warn('better-sqlite3 native module warning, switching to in-memory store:', err.message);
-    db = createFallbackDB();
 }
 
 function initDB() {
