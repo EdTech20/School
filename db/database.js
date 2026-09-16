@@ -1,266 +1,255 @@
 const bcrypt = require('bcryptjs');
 const path = require('path');
-const fs = require('fs');
-
-let db;
 
 const tursoUrl = process.env.TURSO_DATABASE_URL;
 const tursoToken = process.env.TURSO_AUTH_TOKEN;
 
-const memory = {
-    users: [],
-    departments: [],
-    sessions: [],
-    applications: [],
-    evaluations: [],
-    hodReviews: [],
-    passwordResetOTP: [],
-    notifications: []
-};
-
+let db = null;
 let tursoClient = null;
+let dbReady = false;
 
-if (tursoUrl) {
-    try {
-        const { createClient } = require('@libsql/client');
-        tursoClient = createClient({
-            url: tursoUrl,
-            authToken: tursoToken
+// ─────────────────────────────────────────────────────────────
+//  SQLite Table Creation SQL
+// ─────────────────────────────────────────────────────────────
+const CREATE_TABLES_SQL = [
+    `CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL,
+        fullName TEXT NOT NULL, staffId TEXT, department TEXT, role TEXT NOT NULL,
+        isActive INTEGER DEFAULT 1, profileImage TEXT, bio TEXT DEFAULT '', phone TEXT DEFAULT '',
+        certificates TEXT DEFAULT '[]', loginAttempts INTEGER DEFAULT 0, handoverCode TEXT, createdAt TEXT NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS departments (
+        id TEXT PRIMARY KEY, name TEXT UNIQUE NOT NULL, code TEXT, hodId TEXT, createdAt TEXT NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, academicYear TEXT, semester TEXT,
+        status TEXT DEFAULT 'Open', isActive INTEGER DEFAULT 1, createdAt TEXT NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS applications (
+        id TEXT PRIMARY KEY, staffId TEXT NOT NULL, department TEXT NOT NULL, type TEXT NOT NULL,
+        details TEXT NOT NULL, certificates TEXT DEFAULT '[]', sessionId TEXT NOT NULL,
+        sessionName TEXT NOT NULL, status TEXT DEFAULT 'Pending', score REAL DEFAULT 0,
+        submittedAt TEXT NOT NULL, updatedAt TEXT
+    )`,
+    `CREATE TABLE IF NOT EXISTS evaluations (
+        id TEXT PRIMARY KEY, applicationId TEXT, staffId TEXT NOT NULL, evaluatorId TEXT NOT NULL,
+        evaluatorRole TEXT NOT NULL, sessionId TEXT NOT NULL, department TEXT NOT NULL,
+        scores TEXT NOT NULL, totalScore REAL NOT NULL, comments TEXT, submittedAt TEXT NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS hodReviews (
+        id TEXT PRIMARY KEY, applicationId TEXT NOT NULL, staffId TEXT NOT NULL,
+        hodId TEXT NOT NULL, sessionId TEXT NOT NULL, reviewComments TEXT NOT NULL,
+        recommendation TEXT NOT NULL, score REAL NOT NULL, status TEXT NOT NULL, createdAt TEXT NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS passwordResetOTP (
+        id TEXT PRIMARY KEY, email TEXT NOT NULL, otp TEXT NOT NULL,
+        expiresAt TEXT NOT NULL, used INTEGER DEFAULT 0, createdAt TEXT NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS notifications (
+        id TEXT PRIMARY KEY, userId TEXT NOT NULL, title TEXT NOT NULL,
+        message TEXT NOT NULL, isRead INTEGER DEFAULT 0, type TEXT DEFAULT 'info', createdAt TEXT NOT NULL
+    )`
+];
+
+const DEFAULT_DEPTS = [
+    'Computer Science', 'Mathematics', 'Physics', 'Chemistry',
+    'Biology', 'Economics', 'Business Administration', 'Law',
+    'Medicine', 'Engineering', 'Agriculture', 'Education'
+];
+
+const DEFAULT_USERS = [
+    { id: 'STF/2026/001', email: 'vc@university.edu', password: 'vc123456', fullName: 'Vice Chancellor', role: 'VC', department: 'Administration', staffId: 'VC001' },
+    { id: 'STF/2026/002', email: 'hod@university.edu', password: 'hod123456', fullName: 'Dr. John HOD', role: 'HOD', department: 'Computer Science', staffId: 'HOD001' },
+    { id: 'STF/2026/003', email: 'lecturer@university.edu', password: 'lec123456', fullName: 'Jane Lecturer', role: 'Lecturer', department: 'Computer Science', staffId: 'LEC001' },
+    { id: 'STF/2026/004', email: 'student@university.edu', password: 'stu123456', fullName: 'Alice Student', role: 'Student', department: 'Computer Science', staffId: 'STU001' }
+];
+
+// ─────────────────────────────────────────────────────────────
+//  TURSO ASYNC PATH
+// ─────────────────────────────────────────────────────────────
+async function initTurso() {
+    const { createClient } = require('@libsql/client');
+    tursoClient = createClient({ url: tursoUrl, authToken: tursoToken });
+
+    for (const sql of CREATE_TABLES_SQL) {
+        await tursoClient.execute(sql);
+    }
+
+    // Seed departments
+    const deptCount = await tursoClient.execute('SELECT COUNT(*) as count FROM departments');
+    if (Number(deptCount.rows[0].count) === 0) {
+        for (let i = 0; i < DEFAULT_DEPTS.length; i++) {
+            const name = DEFAULT_DEPTS[i];
+            const code = name.split(' ').map(w => w[0]).join('').toUpperCase();
+            await tursoClient.execute({
+                sql: `INSERT INTO departments (id, name, code, createdAt) VALUES (?, ?, ?, ?)`,
+                args: [`DEPT-${String(i + 1).padStart(3, '0')}`, name, code, new Date().toISOString()]
+            });
+        }
+    }
+
+    // Seed users
+    for (const u of DEFAULT_USERS) {
+        const existing = await tursoClient.execute({ sql: 'SELECT id FROM users WHERE email = ?', args: [u.email] });
+        if (existing.rows.length === 0) {
+            const hash = bcrypt.hashSync(u.password, 10);
+            await tursoClient.execute({
+                sql: `INSERT INTO users (id, email, password, fullName, staffId, department, role, isActive, certificates, bio, phone, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, 1, '[]', '', '', ?)`,
+                args: [u.id, u.email, hash, u.fullName, u.staffId, u.department, u.role, new Date().toISOString()]
+            });
+        }
+    }
+
+    // Seed session
+    const sessCount = await tursoClient.execute('SELECT COUNT(*) as count FROM sessions');
+    if (Number(sessCount.rows[0].count) === 0) {
+        await tursoClient.execute({
+            sql: `INSERT INTO sessions (id, name, academicYear, semester, status, isActive, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            args: ['SESS-2026-001', '2026/2027', '2026/2027', 'First Semester', 'Open', 1, new Date().toISOString()]
         });
-        console.log('Connected to Turso Cloud SQLite Database');
-    } catch (e) {
-        console.error('Turso client init error:', e);
     }
+
+    console.log('✅ Turso Cloud DB initialized & seeded');
+    dbReady = true;
+    return buildTursoAdapter();
 }
 
-if (!tursoClient && !process.env.VERCEL) {
-    try {
-        const Database = require('better-sqlite3');
-        const defaultDbPath = path.join(__dirname, '..', 'database.sqlite');
-        const nativeDb = new Database(defaultDbPath);
-        nativeDb.pragma('foreign_keys = ON');
+// ─────────────────────────────────────────────────────────────
+//  TURSO ADAPTER — makes tursoClient look sync-ish to routes
+//  Routes must await all db calls when using turso
+// ─────────────────────────────────────────────────────────────
+function buildTursoAdapter() {
+    return {
+        isTurso: true,
+        client: tursoClient,
 
-        db = {
-            pragma(p) { return nativeDb.pragma(p); },
-            exec(sql) { return nativeDb.exec(sql); },
-            prepare(sql) { return nativeDb.prepare(sql); }
-        };
-    } catch (err) {
-        console.warn('better-sqlite3 native module warning, using fallback engine:', err.message);
-    }
-}
-
-if (!db) {
-    db = {
-        pragma() {},
-        exec(sql) {
-            if (tursoClient) {
-                tursoClient.execute(sql).catch(e => console.error('Turso exec error:', e));
-            }
+        async execute(sql, args = []) {
+            const result = await tursoClient.execute({ sql, args });
+            return result;
         },
+
+        // Convenience wrappers matching better-sqlite3's sync API surface
+        // but returning Promises (routes need to await these)
         prepare(sql) {
-            const cleanSql = sql.trim();
             return {
-                run(...params) {
-                    if (tursoClient) {
-                        tursoClient.execute({ sql, args: params }).catch(e => console.error('Turso run error:', e));
-                    }
-                    if (cleanSql.startsWith('INSERT INTO users')) {
-                        const [id, email, password, fullName, staffId, department, role, isActive, profileImage, certificates, createdAt] = params;
-                        memory.users = memory.users.filter(u => u.id !== id && u.email !== email);
-                        memory.users.push({ id, email, password, fullName, staffId, department, role, isActive: isActive ?? 1, profileImage: profileImage || null, certificates: certificates || '[]', bio: '', phone: '', loginAttempts: 0, handoverCode: null, createdAt: createdAt || new Date().toISOString() });
-                    } else if (cleanSql.startsWith('INSERT INTO departments')) {
-                        const [id, name, code, createdAt] = params;
-                        memory.departments = memory.departments.filter(d => d.id !== id && d.name !== name);
-                        memory.departments.push({ id, name, code, hodId: null, createdAt: createdAt || new Date().toISOString() });
-                    } else if (cleanSql.startsWith('INSERT INTO sessions')) {
-                        const [id, name, academicYear, semester, status, isActive, createdAt] = params;
-                        memory.sessions = memory.sessions.filter(s => s.id !== id);
-                        memory.sessions.push({ id, name, academicYear, semester, status: status || 'Open', isActive: isActive ?? 1, createdAt: createdAt || new Date().toISOString() });
-                    } else if (cleanSql.startsWith('INSERT INTO applications')) {
-                        const [id, staffId, department, type, details, certificates, sessionId, sessionName, status, score, submittedAt] = params;
-                        memory.applications = memory.applications.filter(a => a.id !== id);
-                        memory.applications.push({ id, staffId, department, type, details, certificates: certificates || '[]', sessionId, sessionName, status: status || 'Pending', score: score || 0, submittedAt: submittedAt || new Date().toISOString() });
-                    } else if (cleanSql.startsWith('INSERT INTO evaluations')) {
-                        const [id, applicationId, staffId, evaluatorId, evaluatorRole, sessionId, department, scores, totalScore, comments, submittedAt] = params;
-                        memory.evaluations = memory.evaluations.filter(e => e.id !== id);
-                        memory.evaluations.push({ id, applicationId, staffId, evaluatorId, evaluatorRole, sessionId, department, scores, totalScore, comments, submittedAt: submittedAt || new Date().toISOString() });
-                    } else if (cleanSql.startsWith('INSERT INTO hodReviews')) {
-                        const [id, applicationId, staffId, hodId, sessionId, reviewComments, recommendation, score, status, createdAt] = params;
-                        memory.hodReviews = memory.hodReviews.filter(r => r.id !== id);
-                        memory.hodReviews.push({ id, applicationId, staffId, hodId, sessionId, reviewComments, recommendation, score, status, createdAt: createdAt || new Date().toISOString() });
-                    } else if (cleanSql.startsWith('INSERT INTO notifications')) {
-                        const [id, userId, title, message, isRead, type, createdAt] = params;
-                        memory.notifications = memory.notifications.filter(n => n.id !== id);
-                        memory.notifications.push({ id, userId, title, message, isRead: isRead ?? 0, type: type || 'info', createdAt: createdAt || new Date().toISOString() });
-                    } else if (cleanSql.startsWith('INSERT INTO passwordResetOTP')) {
-                        const [id, email, otp, expiresAt, used, createdAt] = params;
-                        memory.passwordResetOTP.push({ id, email, otp, expiresAt, used: used ?? 0, createdAt: createdAt || new Date().toISOString() });
-                    } else if (cleanSql.includes('UPDATE users')) {
-                        if (params.length >= 2) {
-                            const targetId = params[params.length - 1];
-                            const u = memory.users.find(x => x.id === targetId || x.email === targetId);
-                            if (u) {
-                                if (cleanSql.includes('isActive =')) u.isActive = params[0];
-                                if (cleanSql.includes('password =')) u.password = params[0];
-                                if (cleanSql.includes('handoverCode =')) { u.handoverCode = params[0]; u.loginAttempts = 0; }
-                            }
-                        }
-                    } else if (cleanSql.includes('UPDATE sessions SET status =')) {
-                        memory.sessions.forEach(s => { if (s.status === 'Open') s.status = 'Closed'; });
-                    } else if (cleanSql.includes('UPDATE applications SET status =')) {
-                        const [status, score, updatedAt, id] = params;
-                        const app = memory.applications.find(a => a.id === id);
-                        if (app) { app.status = status; if (score !== undefined) app.score = score; app.updatedAt = updatedAt; }
-                    } else if (cleanSql.startsWith('DELETE FROM departments')) {
-                        const [id] = params;
-                        memory.departments = memory.departments.filter(d => d.id !== id);
-                    }
+                async run(...args) {
+                    await tursoClient.execute({ sql, args });
                     return { changes: 1 };
                 },
-                get(...params) {
-                    if (cleanSql.includes('FROM users WHERE email =')) {
-                        return memory.users.find(u => u.email === params[0]) || null;
-                    } else if (cleanSql.includes('FROM users WHERE id =')) {
-                        return memory.users.find(u => u.id === params[0]) || null;
-                    } else if (cleanSql.includes('COUNT(*) as count FROM users')) {
-                        return { count: memory.users.filter(u => u.id && u.id.includes(params[0]?.replace('%',''))).length };
-                    } else if (cleanSql.includes('COUNT(*) as count FROM departments')) {
-                        return { count: memory.departments.length };
-                    } else if (cleanSql.includes('COUNT(*) as count FROM sessions')) {
-                        return { count: memory.sessions.length };
-                    } else if (cleanSql.includes('FROM sessions WHERE status = \'Open\'')) {
-                        return memory.sessions.find(s => s.status === 'Open') || null;
-                    } else if (cleanSql.includes('FROM applications WHERE staffId = ? AND sessionId = ?')) {
-                        return memory.applications.find(a => a.staffId === params[0] && a.sessionId === params[1]) || null;
-                    } else if (cleanSql.includes('FROM applications WHERE id =')) {
-                        return memory.applications.find(a => a.id === params[0]) || null;
-                    } else if (cleanSql.includes('FROM evaluations WHERE id =')) {
-                        return memory.evaluations.find(e => e.id === params[0]) || null;
-                    } else if (cleanSql.includes('FROM departments WHERE name =')) {
-                        return memory.departments.find(d => d.name === params[0]) || null;
-                    }
-                    return null;
+                async get(...args) {
+                    const r = await tursoClient.execute({ sql, args });
+                    if (r.rows.length === 0) return null;
+                    return rowToObj(r.columns, r.rows[0]);
                 },
-                all(...params) {
-                    if (cleanSql.includes('FROM users')) {
-                        let res = [...memory.users];
-                        if (cleanSql.includes('role = ?')) {
-                            res = res.filter(u => u.role === params[0]);
-                        }
-                        return res;
-                    } else if (cleanSql.includes('FROM departments')) {
-                        return memory.departments.map(d => {
-                            const hod = memory.users.find(u => u.id === d.hodId);
-                            return { ...d, hodName: hod ? hod.fullName : null };
-                        });
-                    } else if (cleanSql.includes('FROM sessions')) {
-                        return [...memory.sessions].sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
-                    } else if (cleanSql.includes('FROM applications')) {
-                        return memory.applications.map(a => {
-                            const u = memory.users.find(x => x.id === a.staffId);
-                            return { ...a, applicantName: u ? u.fullName : 'Unknown', applicantEmail: u ? u.email : '', staffCode: u ? u.staffId : '' };
-                        });
-                    } else if (cleanSql.includes('FROM evaluations')) {
-                        return memory.evaluations.map(e => {
-                            const l = memory.users.find(x => x.id === e.staffId);
-                            const ev = memory.users.find(x => x.id === e.evaluatorId);
-                            return { ...e, staffName: l ? l.fullName : '', staffCode: l ? l.staffId : '', evaluatorName: ev ? ev.fullName : '' };
-                        });
-                    } else if (cleanSql.includes('FROM hodReviews')) {
-                        return [...memory.hodReviews];
-                    } else if (cleanSql.includes('FROM notifications')) {
-                        return memory.notifications.filter(n => n.userId === params[0]);
-                    }
-                    return [];
+                async all(...args) {
+                    const r = await tursoClient.execute({ sql, args });
+                    return r.rows.map(row => rowToObj(r.columns, row));
                 }
             };
+        },
+
+        // Direct async helpers
+        async queryOne(sql, args = []) {
+            const r = await tursoClient.execute({ sql, args });
+            if (r.rows.length === 0) return null;
+            return rowToObj(r.columns, r.rows[0]);
+        },
+
+        async queryAll(sql, args = []) {
+            const r = await tursoClient.execute({ sql, args });
+            return r.rows.map(row => rowToObj(r.columns, row));
+        },
+
+        async run(sql, args = []) {
+            await tursoClient.execute({ sql, args });
+            return { changes: 1 };
         }
     };
 }
 
-function initDB() {
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS users (
-            id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL,
-            fullName TEXT NOT NULL, staffId TEXT, department TEXT, role TEXT NOT NULL,
-            isActive INTEGER DEFAULT 1, profileImage TEXT, bio TEXT, phone TEXT,
-            certificates TEXT DEFAULT '[]', loginAttempts INTEGER DEFAULT 0, handoverCode TEXT, createdAt TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS departments (
-            id TEXT PRIMARY KEY, name TEXT UNIQUE NOT NULL, code TEXT, hodId TEXT, createdAt TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS sessions (
-            id TEXT PRIMARY KEY, name TEXT NOT NULL, academicYear TEXT, semester TEXT, status TEXT DEFAULT 'Open', isActive INTEGER DEFAULT 1, createdAt TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS applications (
-            id TEXT PRIMARY KEY, staffId TEXT NOT NULL, department TEXT NOT NULL, type TEXT NOT NULL, details TEXT NOT NULL, certificates TEXT DEFAULT '[]', sessionId TEXT NOT NULL, sessionName TEXT NOT NULL, status TEXT DEFAULT 'Pending', score REAL DEFAULT 0, submittedAt TEXT NOT NULL, updatedAt TEXT
-        );
-        CREATE TABLE IF NOT EXISTS evaluations (
-            id TEXT PRIMARY KEY, applicationId TEXT, staffId TEXT NOT NULL, evaluatorId TEXT NOT NULL, evaluatorRole TEXT NOT NULL, sessionId TEXT NOT NULL, department TEXT NOT NULL, scores TEXT NOT NULL, totalScore REAL NOT NULL, comments TEXT, submittedAt TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS hodReviews (
-            id TEXT PRIMARY KEY, applicationId TEXT NOT NULL, staffId TEXT NOT NULL, hodId TEXT NOT NULL, sessionId TEXT NOT NULL, reviewComments TEXT NOT NULL, recommendation TEXT NOT NULL, score REAL NOT NULL, status TEXT NOT NULL, createdAt TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS passwordResetOTP (
-            id TEXT PRIMARY KEY, email TEXT NOT NULL, otp TEXT NOT NULL, expiresAt TEXT NOT NULL, used INTEGER DEFAULT 0, createdAt TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS notifications (
-            id TEXT PRIMARY KEY, userId TEXT NOT NULL, title TEXT NOT NULL, message TEXT NOT NULL, isRead INTEGER DEFAULT 0, type TEXT DEFAULT 'info', createdAt TEXT NOT NULL
-        );
-    `);
-
-    seedInitialData();
+function rowToObj(columns, row) {
+    const obj = {};
+    columns.forEach((col, i) => { obj[col] = row[i]; });
+    return obj;
 }
 
-function seedInitialData() {
-    const countRow = db.prepare('SELECT COUNT(*) as count FROM departments').get();
-    const deptCount = countRow ? countRow.count : 0;
+// ─────────────────────────────────────────────────────────────
+//  BETTER-SQLITE3 SYNC PATH (local dev / non-Vercel)
+// ─────────────────────────────────────────────────────────────
+function initSqlite() {
+    const Database = require('better-sqlite3');
+    const dbPath = path.join(__dirname, '..', 'database.sqlite');
+    const nativeDb = new Database(dbPath);
+    nativeDb.pragma('foreign_keys = ON');
+
+    // Create tables
+    for (const sql of CREATE_TABLES_SQL) {
+        nativeDb.prepare(sql).run();
+    }
+
+    // Seed departments
+    const deptCount = nativeDb.prepare('SELECT COUNT(*) as count FROM departments').get().count;
     if (deptCount === 0) {
-        const defaultDepts = [
-            'Computer Science', 'Mathematics', 'Physics', 'Chemistry',
-            'Biology', 'Economics', 'Business Administration', 'Law',
-            'Medicine', 'Engineering', 'Agriculture', 'Education'
-        ];
-        const insertDept = db.prepare('INSERT INTO departments (id, name, code, createdAt) VALUES (?, ?, ?, ?)');
-        defaultDepts.forEach((name, i) => {
+        const ins = nativeDb.prepare('INSERT INTO departments (id, name, code, createdAt) VALUES (?, ?, ?, ?)');
+        DEFAULT_DEPTS.forEach((name, i) => {
             const code = name.split(' ').map(w => w[0]).join('').toUpperCase();
-            insertDept.run(`DEPT-${String(i + 1).padStart(3, '0')}`, name, code, new Date().toISOString());
+            ins.run(`DEPT-${String(i + 1).padStart(3, '0')}`, name, code, new Date().toISOString());
         });
     }
 
-    const defaultUsers = [
-        { id: 'STF/2026/001', email: 'vc@university.edu', password: 'vc123456', fullName: 'Vice Chancellor', role: 'VC', department: 'Administration', staffId: 'VC001' },
-        { id: 'STF/2026/002', email: 'hod@university.edu', password: 'hod123456', fullName: 'Dr. John HOD', role: 'HOD', department: 'Computer Science', staffId: 'HOD001' },
-        { id: 'STF/2026/003', email: 'lecturer@university.edu', password: 'lec123456', fullName: 'Jane Lecturer', role: 'Lecturer', department: 'Computer Science', staffId: 'LEC001' },
-        { id: 'STF/2026/004', email: 'student@university.edu', password: 'stu123456', fullName: 'Alice Student', role: 'Student', department: 'Computer Science', staffId: 'STU001' }
-    ];
-
-    const findUserByEmail = db.prepare('SELECT * FROM users WHERE email = ?');
-    const insertUser = db.prepare(`
-        INSERT INTO users (id, email, password, fullName, staffId, department, role, isActive, certificates, bio, phone, createdAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, '[]', '', '', ?)
-    `);
-
-    defaultUsers.forEach(u => {
-        const existing = findUserByEmail.get(u.email);
-        if (!existing) {
-            const hashedPassword = bcrypt.hashSync(u.password, 10);
-            insertUser.run(u.id, u.email, hashedPassword, u.fullName, u.staffId, u.department, u.role, new Date().toISOString());
+    // Seed users
+    const findUser = nativeDb.prepare('SELECT id FROM users WHERE email = ?');
+    const insUser = nativeDb.prepare(`INSERT INTO users (id, email, password, fullName, staffId, department, role, isActive, certificates, bio, phone, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, 1, '[]', '', '', ?)`);
+    DEFAULT_USERS.forEach(u => {
+        if (!findUser.get(u.email)) {
+            insUser.run(u.id, u.email, bcrypt.hashSync(u.password, 10), u.fullName, u.staffId, u.department, u.role, new Date().toISOString());
         }
     });
 
-    const sCountRow = db.prepare('SELECT COUNT(*) as count FROM sessions').get();
-    const sessionCount = sCountRow ? sCountRow.count : 0;
-    if (sessionCount === 0) {
-        const insertSession = db.prepare(`
-            INSERT INTO sessions (id, name, academicYear, semester, status, isActive, createdAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `);
-        insertSession.run('SESS-2026-001', '2026/2027', '2026/2027', 'First Semester', 'Open', 1, new Date().toISOString());
+    // Seed session
+    const sessCount = nativeDb.prepare('SELECT COUNT(*) as count FROM sessions').get().count;
+    if (sessCount === 0) {
+        nativeDb.prepare(`INSERT INTO sessions (id, name, academicYear, semester, status, isActive, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+            .run('SESS-2026-001', '2026/2027', '2026/2027', 'First Semester', 'Open', 1, new Date().toISOString());
     }
+
+    console.log('✅ Local SQLite DB initialized & seeded');
+    dbReady = true;
+
+    // Wrap to add async helpers matching turso adapter interface
+    return {
+        isTurso: false,
+        prepare(sql) { return nativeDb.prepare(sql); },
+        exec(sql) { return nativeDb.exec(sql); },
+        pragma(p) { return nativeDb.pragma(p); },
+
+        async queryOne(sql, args = []) {
+            return nativeDb.prepare(sql).get(...args) || null;
+        },
+        async queryAll(sql, args = []) {
+            return nativeDb.prepare(sql).all(...args);
+        },
+        async run(sql, args = []) {
+            const r = nativeDb.prepare(sql).run(...args);
+            return { changes: r.changes };
+        }
+    };
 }
 
-initDB();
+// ─────────────────────────────────────────────────────────────
+//  MODULE INIT — export a promise that resolves to the db adapter
+// ─────────────────────────────────────────────────────────────
+let dbPromise;
 
-module.exports = db;
+if (tursoUrl) {
+    dbPromise = initTurso().catch(err => {
+        console.error('Turso init failed, falling back to local SQLite:', err.message);
+        return initSqlite();
+    });
+} else {
+    dbPromise = Promise.resolve(initSqlite());
+}
+
+// Export both the promise and a sync-safe proxy
+// Routes should do: const db = await require('./db/database');
+module.exports = dbPromise;
