@@ -177,7 +177,10 @@ function rowToObj(columns, row) {
 //  BETTER-SQLITE3 SYNC PATH (local dev / non-Vercel)
 // ─────────────────────────────────────────────────────────────
 function initSqlite() {
-    const Database = require('better-sqlite3');
+    // Use eval to prevent Vercel/webpack bundlers from statically analyzing
+    // this require (better-sqlite3 is a native module that fails on serverless)
+    // eslint-disable-next-line no-eval
+    const Database = eval('require')('better-sqlite3');
     const dbPath = path.join(__dirname, '..', 'database.sqlite');
     const nativeDb = new Database(dbPath);
     nativeDb.pragma('foreign_keys = ON');
@@ -242,9 +245,11 @@ function initSqlite() {
 let dbPromise;
 
 if (tursoUrl) {
-    // Turso Cloud — used in production / Vercel. Never fall back to native SQLite here
-    // because better-sqlite3 native binaries are not available on Vercel serverless.
+    // Turso Cloud — used in production / Vercel.
     dbPromise = initTurso();
+} else if (process.env.VERCEL) {
+    // Vercel without Turso configured — fail loudly so dev knows to set env vars
+    dbPromise = Promise.reject(new Error('TURSO_DATABASE_URL is required on Vercel. Set it in Vercel Dashboard > Settings > Environment Variables.'));
 } else {
     // Local development — use better-sqlite3 (sync, fast)
     dbPromise = Promise.resolve(initSqlite());
