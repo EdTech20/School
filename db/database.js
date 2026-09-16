@@ -242,11 +242,11 @@ function initSqlite() {
 let dbPromise;
 
 if (tursoUrl) {
-    dbPromise = initTurso().catch(err => {
-        console.error('Turso init failed, falling back to local SQLite:', err.message);
-        return initSqlite();
-    });
+    // Turso Cloud — used in production / Vercel. Never fall back to native SQLite here
+    // because better-sqlite3 native binaries are not available on Vercel serverless.
+    dbPromise = initTurso();
 } else {
+    // Local development — use better-sqlite3 (sync, fast)
     dbPromise = Promise.resolve(initSqlite());
 }
 

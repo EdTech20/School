@@ -10,7 +10,10 @@
           "LOGINS/**",
           "PAGES/**",
           "Style&Functions/**",
-          "Nav&Slide/**"
+          "Nav&Slide/**",
+          "db/**",
+          "middleware/**",
+          "routes/**"
         ]
       }
     }
